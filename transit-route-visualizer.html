@@ -483,32 +483,58 @@
             walk: '🚶'
         };
 
-        // 추천 장소 데이터
-        const recommendations = {
-            '서울역': [
-                { type: 'historical', name: '경복궁', desc: '조선시대 궁궐', category: '역사/문화' },
-                { type: 'shopping', name: '명동', desc: '쇼핑 거리', category: '쇼핑' },
-                { type: 'cafe', name: '북촌한옥마을', desc: '전통 카페', category: '카페' },
-                { type: 'korean', name: '광장시장', desc: '전통 한식 시장', category: '한식' }
-            ],
-            '강남역': [
-                { type: 'shopping', name: '코엑스몰', desc: '대형 쇼핑몰', category: '쇼핑' },
-                { type: 'cafe', name: '가로수길', desc: '트렌디한 카페거리', category: '카페' },
-                { type: 'western', name: '청담동', desc: '고급 양식당', category: '양식' }
-            ],
-            '부산역': [
-                { type: 'nature', name: '해운대', desc: '아름다운 해변', category: '자연/힐링' },
-                { type: 'historical', name: '감천문화마을', desc: '예술 마을', category: '역사/문화' },
-                { type: 'local', name: '자갈치시장', desc: '신선한 해산물', category: '향토음식' },
-                { type: 'cafe', name: '송도해수욕장', desc: '바다뷰 카페', category: '카페' }
-            ],
-            '제주': [
-                { type: 'nature', name: '한라산', desc: '제주의 상징 산', category: '자연/힐링' },
-                { type: 'nature', name: '성산일출봉', desc: '일출 명소', category: '자연/힐링' },
-                { type: 'local', name: '흑돼지 거리', desc: '제주 흑돼지', category: '향토음식' },
-                { type: 'cafe', name: '애월 카페거리', desc: '바다뷰 카페', category: '카페' }
-            ]
-        };
+        // 추천 장소 데이터 (좌표 포함)
+        const allRecommendations = [
+            // 서울 지역
+            { type: 'historical', name: '경복궁', desc: '조선시대 궁궐', category: '역사/문화', lat: 37.5796, lng: 126.9770 },
+            { type: 'shopping', name: '명동', desc: '쇼핑 거리', category: '쇼핑', lat: 37.5636, lng: 126.9834 },
+            { type: 'cafe', name: '북촌한옥마을', desc: '전통 카페', category: '카페', lat: 37.5823, lng: 126.9832 },
+            { type: 'korean', name: '광장시장', desc: '전통 한식 시장', category: '한식', lat: 37.5707, lng: 126.9997 },
+            { type: 'shopping', name: '코엑스몰', desc: '대형 쇼핑몰', category: '쇼핑', lat: 37.5115, lng: 127.0595 },
+            { type: 'cafe', name: '가로수길', desc: '트렌디한 카페거리', category: '카페', lat: 37.5205, lng: 127.0227 },
+            { type: 'western', name: '청담동', desc: '고급 양식당', category: '양식', lat: 37.5240, lng: 127.0473 },
+            { type: 'historical', name: '남산타워', desc: '서울 전망', category: '역사/문화', lat: 37.5512, lng: 126.9882 },
+            { type: 'nature', name: '한강공원', desc: '휴식 공간', category: '자연/힐링', lat: 37.5293, lng: 126.9345 },
+
+            // 부산 지역
+            { type: 'nature', name: '해운대', desc: '아름다운 해변', category: '자연/힐링', lat: 35.1586, lng: 129.1603 },
+            { type: 'historical', name: '감천문화마을', desc: '예술 마을', category: '역사/문화', lat: 35.0976, lng: 129.0104 },
+            { type: 'local', name: '자갈치시장', desc: '신선한 해산물', category: '향토음식', lat: 35.0967, lng: 129.0306 },
+            { type: 'cafe', name: '송도해수욕장', desc: '바다뷰 카페', category: '카페', lat: 35.0758, lng: 129.0175 },
+            { type: 'nature', name: '광안리해변', desc: '야경 명소', category: '자연/힐링', lat: 35.1531, lng: 129.1185 },
+            { type: 'historical', name: '용두산공원', desc: '부산타워', category: '역사/문화', lat: 35.1008, lng: 129.0320 },
+
+            // 대전 지역
+            { type: 'nature', name: '엑스포과학공원', desc: '과학 체험', category: '자연/힐링', lat: 36.3725, lng: 127.3845 },
+            { type: 'shopping', name: '성심당', desc: '유명 빵집', category: '쇼핑', lat: 36.3277, lng: 127.4265 },
+            { type: 'korean', name: '대전 중앙시장', desc: '전통시장', category: '한식', lat: 36.3283, lng: 127.4254 },
+
+            // 대구 지역
+            { type: 'shopping', name: '동성로', desc: '번화가', category: '쇼핑', lat: 35.8691, lng: 128.5959 },
+            { type: 'historical', name: '서문시장', desc: '야시장', category: '역사/문화', lat: 35.8713, lng: 128.5823 },
+            { type: 'korean', name: '김광석 거리', desc: '문화 거리', category: '한식', lat: 35.8508, lng: 128.5736 },
+
+            // 광주 지역
+            { type: 'historical', name: '국립아시아문화전당', desc: '문화 공간', category: '역사/문화', lat: 35.1462, lng: 126.9181 },
+            { type: 'local', name: '양동시장', desc: '전통시장', category: '향토음식', lat: 35.1487, lng: 126.9165 },
+
+            // 제주 지역
+            { type: 'nature', name: '한라산', desc: '제주의 상징 산', category: '자연/힐링', lat: 33.3617, lng: 126.5292 },
+            { type: 'nature', name: '성산일출봉', desc: '일출 명소', category: '자연/힐링', lat: 33.4584, lng: 126.9423 },
+            { type: 'local', name: '흑돼지 거리', desc: '제주 흑돼지', category: '향토음식', lat: 33.4996, lng: 126.5312 },
+            { type: 'cafe', name: '애월 카페거리', desc: '바다뷰 카페', category: '카페', lat: 33.4617, lng: 126.3192 },
+            { type: 'nature', name: '섭지코지', desc: '해안 절경', category: '자연/힐링', lat: 33.4241, lng: 126.9294 },
+
+            // 경주 지역
+            { type: 'historical', name: '불국사', desc: '세계문화유산', category: '역사/문화', lat: 35.7898, lng: 129.3320 },
+            { type: 'historical', name: '첨성대', desc: '천문대', category: '역사/문화', lat: 35.8347, lng: 129.2190 },
+            { type: 'local', name: '황남빵', desc: '경주 특산품', category: '향토음식', lat: 35.8336, lng: 129.2185 },
+
+            // 전주 지역
+            { type: 'historical', name: '전주 한옥마을', desc: '전통 한옥', category: '역사/문화', lat: 35.8156, lng: 127.1530 },
+            { type: 'local', name: '전주 비빔밥', desc: '전통 비빔밥', category: '향토음식', lat: 35.8221, lng: 127.1489 },
+            { type: 'cafe', name: '전동성당', desc: '역사적 건축물', category: '카페', lat: 35.8162, lng: 127.1521 }
+        ];
 
         // 폼 제출 처리
         document.getElementById('routeForm').addEventListener('submit', async function(e) {
@@ -531,10 +557,10 @@
 
             try {
                 // OSRM API로 실제 경로 조회 (무료, API 키 불필요)
-                await generateRouteWithOSRM(departure, arrival, transportMode, departureTime, travelDuration);
+                const routeCoordinates = await generateRouteWithOSRM(departure, arrival, transportMode, departureTime, travelDuration);
 
-                // 추천 장소 표시
-                showRecommendations(arrival, interests, foodPrefs);
+                // 경로 인근 추천 장소 표시
+                showRecommendationsAlongRoute(routeCoordinates, interests, foodPrefs);
             } catch (error) {
                 alert('경로 검색 중 오류가 발생했습니다: ' + error.message);
                 console.error(error);
@@ -594,18 +620,19 @@
 
                 if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
                     // OSRM 응답을 기반으로 경로 시각화
-                    displayOSRMRoute(data, startCoord, endCoord, departure, arrival, time, duration, actualDistance, mode);
+                    const coordinates = displayOSRMRoute(data, startCoord, endCoord, departure, arrival, time, duration, actualDistance, mode);
+                    return coordinates;
                 } else {
                     // OSRM 실패 시 스마트 추정 경로 사용
                     console.warn('OSRM 경로 조회 실패, 추정 경로 사용');
-                    await generateRouteWithEstimation(departure, arrival, mode, time, duration);
+                    return await generateRouteWithEstimation(departure, arrival, mode, time, duration);
                 }
 
             } catch (error) {
                 console.error('OSRM API 오류:', error);
                 // API 실패 시 추정 경로로 대체
                 console.log('추정 경로로 전환합니다.');
-                await generateRouteWithEstimation(departure, arrival, mode, time, duration);
+                return await generateRouteWithEstimation(departure, arrival, mode, time, duration);
             }
         }
 
@@ -697,6 +724,9 @@
 
             // 경로 정보 패널 업데이트
             displayRouteInfo(routes, time);
+
+            // 경로 좌표 반환
+            return coordinates;
         }
 
         // 실제 경로를 교통수단별로 분할
@@ -864,6 +894,9 @@
 
             // 경로 정보 패널 업데이트
             displayRouteInfo(routes, time);
+
+            // 경로 좌표 반환
+            return allPoints;
         }
 
         function addStartEndMarkers(startLoc, endLoc, departure, arrival, time, duration) {
@@ -1082,45 +1115,87 @@
             routeInfo.style.display = 'block';
         }
 
-        function showRecommendations(location, interests, foodPrefs) {
+        // 경로 인근 추천 장소 표시
+        function showRecommendationsAlongRoute(routeCoordinates, interests, foodPrefs) {
+            if (!routeCoordinates || routeCoordinates.length === 0) {
+                return;
+            }
+
             const recPanel = document.getElementById('recommendations');
             const recList = document.getElementById('recommendationsList');
 
-            // 위치 기반 추천 찾기
-            let recs = [];
-            for (const [loc, places] of Object.entries(recommendations)) {
-                if (loc.includes(location) || location.includes(loc.replace('역', ''))) {
-                    recs = places;
-                    break;
-                }
-            }
-
-            // 기본 추천 (위치를 찾지 못한 경우)
-            if (recs.length === 0) {
-                recs = recommendations['서울역'];
-            }
+            // 경로 인근 장소 필터링 (경로에서 10km 이내)
+            const nearbyPlaces = allRecommendations.filter(place => {
+                const minDistance = Math.min(...routeCoordinates.map(coord =>
+                    calculateDistance(coord[0], coord[1], place.lat, place.lng)
+                ));
+                return minDistance <= 10; // 10km 이내
+            });
 
             // 취향 필터링
+            let recs = nearbyPlaces;
             const allPrefs = [...interests, ...foodPrefs];
             if (allPrefs.length > 0) {
-                const filteredRecs = recs.filter(rec => allPrefs.includes(rec.type));
+                const filteredRecs = nearbyPlaces.filter(rec => allPrefs.includes(rec.type));
                 if (filteredRecs.length > 0) {
                     recs = filteredRecs;
                 }
             }
 
+            // 거리순으로 정렬
+            recs.sort((a, b) => {
+                const distA = Math.min(...routeCoordinates.map(coord =>
+                    calculateDistance(coord[0], coord[1], a.lat, a.lng)
+                ));
+                const distB = Math.min(...routeCoordinates.map(coord =>
+                    calculateDistance(coord[0], coord[1], b.lat, b.lng)
+                ));
+                return distA - distB;
+            });
+
+            // 지도에 추천 장소 마커 추가
+            recs.slice(0, 8).forEach((place, index) => {
+                const minDist = Math.min(...routeCoordinates.map(coord =>
+                    calculateDistance(coord[0], coord[1], place.lat, place.lng)
+                ));
+
+                const marker = L.marker([place.lat, place.lng], {
+                    icon: L.divIcon({
+                        html: `<div style="background: #f59e0b; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">📍</div>`,
+                        className: '',
+                        iconSize: [28, 28]
+                    })
+                }).addTo(markersLayer);
+
+                marker.bindPopup(`
+                    <b>${place.name}</b><br>
+                    ${place.desc}<br>
+                    <span style="color: #666; font-size: 0.9em;">${place.category} • 경로에서 ${minDist.toFixed(1)}km</span>
+                `);
+
+                // 마커 클릭 시 해당 장소로 지도 이동
+                marker.on('click', function() {
+                    map.setView([place.lat, place.lng], 14);
+                });
+            });
+
             // HTML 생성
             let html = '';
-            recs.slice(0, 5).forEach(rec => {
+            recs.slice(0, 8).forEach(rec => {
+                const minDist = Math.min(...routeCoordinates.map(coord =>
+                    calculateDistance(coord[0], coord[1], rec.lat, rec.lng)
+                ));
+
                 html += `
                     <div class="recommendation-item">
                         <h4>${rec.name}</h4>
                         <p>${rec.desc} • ${rec.category}</p>
+                        <p style="color: #06b6d4; font-size: 0.85em; margin-top: 5px;">📍 경로에서 ${minDist.toFixed(1)}km</p>
                     </div>
                 `;
             });
 
-            recList.innerHTML = html || '<p>이 지역의 추천 장소가 없습니다.</p>';
+            recList.innerHTML = html || '<p>경로 인근에 추천 장소가 없습니다.</p>';
             recPanel.style.display = 'block';
         }
 
