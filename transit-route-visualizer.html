@@ -655,6 +655,13 @@
             // OSRM 경로 좌표를 Leaflet 형식으로 변환
             const coordinates = route.geometry.coordinates.map(coord => [coord[1], coord[0]]);
 
+            // 전체 경로를 하나의 회색 배경선으로 먼저 그리기 (테두리 효과)
+            L.polyline(coordinates, {
+                color: '#333',
+                weight: 8,
+                opacity: 0.3
+            }).addTo(routeLayer);
+
             // 거리에 따라 교통수단 분류
             let routes = createTransportSegments(coordinates, totalDistance, totalDuration, distance, mode);
 
@@ -664,9 +671,11 @@
 
                 const routeLine = L.polyline(routeSegment.points, {
                     color: color,
-                    weight: 4,
-                    opacity: 0.7,
-                    dashArray: routeSegment.type === 'walk' ? '10, 10' : null
+                    weight: 6,
+                    opacity: 0.9,
+                    dashArray: routeSegment.type === 'walk' ? '10, 10' : null,
+                    lineJoin: 'round',
+                    lineCap: 'round'
                 }).addTo(routeLayer);
 
                 routeLine.bindPopup(`<b>${routeSegment.name}</b><br>${routeSegment.time}<br>${routeSegment.distance}`);
@@ -675,16 +684,16 @@
                 if (routeSegment.waypoint) {
                     L.marker([routeSegment.waypoint.lat, routeSegment.waypoint.lng], {
                         icon: L.divIcon({
-                            html: `<div style="background: ${color}; color: white; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.2);">${transportIcons[routeSegment.type]}</div>`,
+                            html: `<div style="background: ${color}; color: white; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; border: 3px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.3);">${transportIcons[routeSegment.type]}</div>`,
                             className: '',
-                            iconSize: [30, 30]
+                            iconSize: [35, 35]
                         })
                     }).addTo(markersLayer).bindPopup(`<b>${routeSegment.name}</b><br>${routeSegment.time}`);
                 }
             });
 
             // 지도 범위 조정
-            map.fitBounds(coordinates);
+            map.fitBounds(coordinates, { padding: [50, 50] });
 
             // 경로 정보 패널 업데이트
             displayRouteInfo(routes, time);
@@ -811,18 +820,28 @@
             // 경로선 그리기
             let allPoints = [[startLoc.lat, startLoc.lng]];
 
+            // 모든 경로의 포인트 수집
+            routes.forEach(route => {
+                allPoints = allPoints.concat(route.points);
+            });
+
+            // 전체 경로 배경선 (테두리 효과)
+            L.polyline(allPoints, {
+                color: '#333',
+                weight: 8,
+                opacity: 0.3
+            }).addTo(routeLayer);
+
             routes.forEach((route, index) => {
                 const color = getTransportColor(route.type);
 
                 if (route.waypoint) {
-                    allPoints.push([route.waypoint.lat, route.waypoint.lng]);
-
                     // 중간 지점 마커
                     L.marker([route.waypoint.lat, route.waypoint.lng], {
                         icon: L.divIcon({
-                            html: `<div style="background: ${color}; color: white; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.2);">${transportIcons[route.type]}</div>`,
+                            html: `<div style="background: ${color}; color: white; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; border: 3px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.3);">${transportIcons[route.type]}</div>`,
                             className: '',
-                            iconSize: [30, 30]
+                            iconSize: [35, 35]
                         })
                     }).addTo(markersLayer).bindPopup(`<b>${route.name}</b><br>${route.time}`);
                 }
@@ -830,18 +849,18 @@
                 // 경로선
                 const routeLine = L.polyline(route.points, {
                     color: color,
-                    weight: 4,
-                    opacity: 0.7,
-                    dashArray: route.type === 'walk' ? '10, 10' : null
+                    weight: 6,
+                    opacity: 0.9,
+                    dashArray: route.type === 'walk' ? '10, 10' : null,
+                    lineJoin: 'round',
+                    lineCap: 'round'
                 }).addTo(routeLayer);
 
                 routeLine.bindPopup(`<b>${route.name}</b><br>${route.time}<br>${route.distance}`);
             });
 
-            allPoints.push([endLoc.lat, endLoc.lng]);
-
             // 지도 범위 조정
-            map.fitBounds(allPoints);
+            map.fitBounds(allPoints, { padding: [50, 50] });
 
             // 경로 정보 패널 업데이트
             displayRouteInfo(routes, time);
