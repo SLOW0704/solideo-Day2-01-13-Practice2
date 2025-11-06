@@ -483,6 +483,54 @@
             walk: '🚶'
         };
 
+        // 지역별 실제 교통 노선 데이터
+        const transportData = {
+            seoul: {
+                buses: ['370', '472', '740', '143', '301', '402', '601', '152', '340', '401'],
+                subways: ['1호선', '2호선', '3호선', '4호선', '5호선', '6호선', '7호선', '8호선', '9호선', '신분당선', '경의중앙선']
+            },
+            busan: {
+                buses: ['1000', '1001', '1003', '2', '7', '15', '31', '38', '40', '43'],
+                subways: ['1호선', '2호선', '3호선', '4호선', '동해선']
+            },
+            daejeon: {
+                buses: ['101', '102', '103', '201', '301', '606', '705', '911'],
+                subways: ['1호선']
+            },
+            daegu: {
+                buses: ['100', '323', '401', '420', '503', '600', '706', '814'],
+                subways: ['1호선', '2호선', '3호선']
+            },
+            gwangju: {
+                buses: ['1000', '36', '77', '518', '693', '수완1'],
+                subways: ['1호선']
+            },
+            incheon: {
+                buses: ['6', '14', '16', '24', '37', '45', '111', '303'],
+                subways: ['1호선', '2호선', '수인분당선']
+            }
+        };
+
+        // KTX/SRT 열차 번호 목록
+        const ktxNumbers = ['101', '103', '105', '107', '201', '203', '301', '401', '501'];
+        const srtNumbers = ['301', '303', '305', '401', '501'];
+
+        // 랜덤 선택 헬퍼 함수
+        function getRandomItem(array) {
+            return array[Math.floor(Math.random() * array.length)];
+        }
+
+        // 좌표로 지역 판단
+        function getRegionByCoordinates(lat, lng) {
+            if (lat >= 37.4 && lat <= 37.7 && lng >= 126.7 && lng <= 127.2) return 'seoul';
+            if (lat >= 35.0 && lat <= 35.3 && lng >= 128.9 && lng <= 129.2) return 'busan';
+            if (lat >= 36.2 && lat <= 36.5 && lng >= 127.2 && lng <= 127.6) return 'daejeon';
+            if (lat >= 35.7 && lat <= 36.0 && lng >= 128.4 && lng <= 128.8) return 'daegu';
+            if (lat >= 35.0 && lat <= 35.3 && lng >= 126.7 && lng <= 127.0) return 'gwangju';
+            if (lat >= 37.3 && lat <= 37.6 && lng >= 126.5 && lng <= 126.9) return 'incheon';
+            return 'seoul'; // 기본값
+        }
+
         // 추천 장소 데이터 (좌표 포함)
         const allRecommendations = [
             // 서울 지역
@@ -734,6 +782,10 @@
             let routes = [];
             const numPoints = coordinates.length;
 
+            // 출발지와 도착지 지역 파악
+            const startRegion = getRegionByCoordinates(coordinates[0][0], coordinates[0][1]);
+            const endRegion = getRegionByCoordinates(coordinates[coordinates.length - 1][0], coordinates[coordinates.length - 1][1]);
+
             if (realDistance < 2) {
                 // 2km 미만 - 도보만
                 routes.push({
@@ -746,9 +798,12 @@
             } else if (realDistance < 10) {
                 // 2-10km - 버스
                 const midPoint = Math.floor(numPoints / 2);
+                const region = startRegion;
+                const busNumber = getRandomItem(transportData[region]?.buses || transportData.seoul.buses);
+
                 routes.push({
                     type: 'bus',
-                    name: '시내버스',
+                    name: `${busNumber}번 버스`,
                     time: totalDuration + '분',
                     distance: totalDistance + 'km',
                     waypoint: { lat: coordinates[midPoint][0], lng: coordinates[midPoint][1] },
@@ -759,23 +814,39 @@
                 const segment1 = Math.floor(numPoints * 0.15);
                 const segment2 = Math.floor(numPoints * 0.85);
 
+                // 시작 지역 버스
+                const busNumber = getRandomItem(transportData[startRegion]?.buses || transportData.seoul.buses);
                 routes.push({
                     type: 'bus',
-                    name: '시내버스 환승',
+                    name: `${busNumber}번 버스`,
                     time: Math.round(totalDuration * 0.1) + '분',
                     distance: (parseFloat(totalDistance) * 0.1).toFixed(1) + 'km',
                     waypoint: { lat: coordinates[segment1][0], lng: coordinates[segment1][1] },
                     points: coordinates.slice(0, segment1)
                 });
 
-                routes.push({
-                    type: 'train',
-                    name: realDistance > 50 ? 'KTX' : '지하철/광역전철',
-                    time: Math.round(totalDuration * 0.8) + '분',
-                    distance: (parseFloat(totalDistance) * 0.85).toFixed(1) + 'km',
-                    waypoint: { lat: coordinates[Math.floor(numPoints/2)][0], lng: coordinates[Math.floor(numPoints/2)][1] },
-                    points: coordinates.slice(segment1, segment2)
-                });
+                // 지하철 또는 KTX
+                if (realDistance > 50) {
+                    const trainNumber = getRandomItem(ktxNumbers);
+                    routes.push({
+                        type: 'train',
+                        name: `KTX ${trainNumber}`,
+                        time: Math.round(totalDuration * 0.8) + '분',
+                        distance: (parseFloat(totalDistance) * 0.85).toFixed(1) + 'km',
+                        waypoint: { lat: coordinates[Math.floor(numPoints/2)][0], lng: coordinates[Math.floor(numPoints/2)][1] },
+                        points: coordinates.slice(segment1, segment2)
+                    });
+                } else {
+                    const subwayLine = getRandomItem(transportData[startRegion]?.subways || transportData.seoul.subways);
+                    routes.push({
+                        type: 'train',
+                        name: `지하철 ${subwayLine}`,
+                        time: Math.round(totalDuration * 0.8) + '분',
+                        distance: (parseFloat(totalDistance) * 0.85).toFixed(1) + 'km',
+                        waypoint: { lat: coordinates[Math.floor(numPoints/2)][0], lng: coordinates[Math.floor(numPoints/2)][1] },
+                        points: coordinates.slice(segment1, segment2)
+                    });
+                }
 
                 routes.push({
                     type: 'walk',
@@ -789,9 +860,11 @@
                 const segment1 = Math.floor(numPoints * 0.05);
                 const segment2 = Math.floor(numPoints * 0.95);
 
+                // 출발지 버스
+                const busNumber = getRandomItem(transportData[startRegion]?.buses || transportData.seoul.buses);
                 routes.push({
                     type: 'bus',
-                    name: mode === 'plane' ? '공항 셔틀' : '시내버스',
+                    name: mode === 'plane' ? `공항버스 ${busNumber}번` : `${busNumber}번 버스`,
                     time: '20-25분',
                     distance: '10-15km',
                     waypoint: { lat: coordinates[segment1][0], lng: coordinates[segment1][1] },
@@ -799,18 +872,21 @@
                 });
 
                 if (mode === 'plane' || realDistance > 300) {
+                    const flightNumber = 'KE' + Math.floor(Math.random() * 900 + 100);
                     routes.push({
                         type: 'plane',
-                        name: '국내선 항공편',
+                        name: `${flightNumber}편`,
                         time: Math.round(60 + realDistance / 10) + '분',
                         distance: realDistance.toFixed(0) + 'km',
                         waypoint: { lat: coordinates[Math.floor(numPoints/2)][0], lng: coordinates[Math.floor(numPoints/2)][1] },
                         points: coordinates.slice(segment1, segment2)
                     });
                 } else {
+                    const trainType = Math.random() > 0.5 ? 'KTX' : 'SRT';
+                    const trainNumber = getRandomItem(trainType === 'KTX' ? ktxNumbers : srtNumbers);
                     routes.push({
                         type: 'train',
-                        name: 'KTX/SRT',
+                        name: `${trainType} ${trainNumber}`,
                         time: Math.round(realDistance / 2.5) + '분',
                         distance: realDistance.toFixed(0) + 'km',
                         waypoint: { lat: coordinates[Math.floor(numPoints/2)][0], lng: coordinates[Math.floor(numPoints/2)][1] },
@@ -923,6 +999,10 @@
         function generateSmartRoute(start, end, distance, mode) {
             let routes = [];
 
+            // 출발지와 도착지 지역 파악
+            const startRegion = getRegionByCoordinates(start.lat, start.lng);
+            const endRegion = getRegionByCoordinates(end.lat, end.lng);
+
             if (distance < 2) {
                 // 2km 미만 - 도보
                 routes.push({
@@ -934,9 +1014,10 @@
                 });
             } else if (distance < 10) {
                 // 2-10km - 버스
+                const busNumber = getRandomItem(transportData[startRegion]?.buses || transportData.seoul.buses);
                 routes.push({
                     type: 'bus',
-                    name: '시내버스 이동',
+                    name: `${busNumber}번 버스`,
                     time: Math.round(distance * 4) + '분',
                     distance: distance.toFixed(1) + 'km',
                     waypoint: {
@@ -952,9 +1033,10 @@
                 const busDistance = 3;
                 const trainDistance = distance - busDistance - 1;
 
+                const busNumber = getRandomItem(transportData[startRegion]?.buses || transportData.seoul.buses);
                 routes.push({
                     type: 'bus',
-                    name: '시내버스 환승',
+                    name: `${busNumber}번 버스`,
                     time: Math.round(busDistance * 4) + '분',
                     distance: busDistance.toFixed(1) + 'km',
                     waypoint: {
@@ -967,21 +1049,41 @@
                     ]
                 });
 
-                routes.push({
-                    type: 'train',
-                    name: distance > 50 ? 'KTX' : '지하철/광역전철',
-                    time: Math.round(trainDistance / (distance > 50 ? 2 : 0.5)) + '분',
-                    distance: trainDistance.toFixed(1) + 'km',
-                    waypoint: {
-                        lat: start.lat + (end.lat - start.lat) * 0.5,
-                        lng: start.lng + (end.lng - start.lng) * 0.5
-                    },
-                    points: [
-                        [start.lat + (end.lat - start.lat) * 0.1, start.lng + (end.lng - start.lng) * 0.1],
-                        [start.lat + (end.lat - start.lat) * 0.5, start.lng + (end.lng - start.lng) * 0.5],
-                        [end.lat - (end.lat - start.lat) * 0.05, end.lng - (end.lng - start.lng) * 0.05]
-                    ]
-                });
+                if (distance > 50) {
+                    const trainNumber = getRandomItem(ktxNumbers);
+                    routes.push({
+                        type: 'train',
+                        name: `KTX ${trainNumber}`,
+                        time: Math.round(trainDistance / 2) + '분',
+                        distance: trainDistance.toFixed(1) + 'km',
+                        waypoint: {
+                            lat: start.lat + (end.lat - start.lat) * 0.5,
+                            lng: start.lng + (end.lng - start.lng) * 0.5
+                        },
+                        points: [
+                            [start.lat + (end.lat - start.lat) * 0.1, start.lng + (end.lng - start.lng) * 0.1],
+                            [start.lat + (end.lat - start.lat) * 0.5, start.lng + (end.lng - start.lng) * 0.5],
+                            [end.lat - (end.lat - start.lat) * 0.05, end.lng - (end.lng - start.lng) * 0.05]
+                        ]
+                    });
+                } else {
+                    const subwayLine = getRandomItem(transportData[startRegion]?.subways || transportData.seoul.subways);
+                    routes.push({
+                        type: 'train',
+                        name: `지하철 ${subwayLine}`,
+                        time: Math.round(trainDistance / 0.5) + '분',
+                        distance: trainDistance.toFixed(1) + 'km',
+                        waypoint: {
+                            lat: start.lat + (end.lat - start.lat) * 0.5,
+                            lng: start.lng + (end.lng - start.lng) * 0.5
+                        },
+                        points: [
+                            [start.lat + (end.lat - start.lat) * 0.1, start.lng + (end.lng - start.lng) * 0.1],
+                            [start.lat + (end.lat - start.lat) * 0.5, start.lng + (end.lng - start.lng) * 0.5],
+                            [end.lat - (end.lat - start.lat) * 0.05, end.lng - (end.lng - start.lng) * 0.05]
+                        ]
+                    });
+                }
 
                 routes.push({
                     type: 'walk',
@@ -996,9 +1098,10 @@
             } else {
                 // 100km 이상 - 장거리 (비행기/KTX)
                 if (mode === 'plane' || distance > 300) {
+                    const busNumber = getRandomItem(transportData[startRegion]?.buses || transportData.seoul.buses);
                     routes.push({
                         type: 'bus',
-                        name: '공항 셔틀',
+                        name: `공항버스 ${busNumber}번`,
                         time: '25분',
                         distance: '15km',
                         waypoint: {
@@ -1011,9 +1114,10 @@
                         ]
                     });
 
+                    const flightNumber = 'KE' + Math.floor(Math.random() * 900 + 100);
                     routes.push({
                         type: 'plane',
-                        name: '국내선 항공편',
+                        name: `${flightNumber}편`,
                         time: Math.round(60 + distance / 10) + '분',
                         distance: distance.toFixed(0) + 'km',
                         waypoint: {
@@ -1027,9 +1131,10 @@
                         ]
                     });
                 } else {
+                    const busNumber = getRandomItem(transportData[startRegion]?.buses || transportData.seoul.buses);
                     routes.push({
                         type: 'bus',
-                        name: '시내버스',
+                        name: `${busNumber}번 버스`,
                         time: '20분',
                         distance: '8km',
                         waypoint: {
@@ -1042,9 +1147,11 @@
                         ]
                     });
 
+                    const trainType = Math.random() > 0.5 ? 'KTX' : 'SRT';
+                    const trainNumber = getRandomItem(trainType === 'KTX' ? ktxNumbers : srtNumbers);
                     routes.push({
                         type: 'train',
-                        name: 'KTX/SRT',
+                        name: `${trainType} ${trainNumber}`,
                         time: Math.round(distance / 2.5) + '분',
                         distance: distance.toFixed(0) + 'km',
                         waypoint: {
