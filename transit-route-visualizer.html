@@ -369,10 +369,18 @@
                         </select>
                     </div>
 
+                    <div class="form-group">
+                        <label for="odsayApiKey">ODsay API 키 (선택사항)</label>
+                        <input type="text" id="odsayApiKey" placeholder="실제 대중교통 정보 조회용">
+                        <small style="display: block; margin-top: 5px; color: #666; font-size: 0.85em;">
+                            <a href="https://lab.odsay.com/" target="_blank" style="color: #06b6d4;">ODsay Lab</a>에서 무료로 발급 가능 (1일 1,000회)
+                        </small>
+                    </div>
+
                     <button type="submit" class="btn">🔍 경로 검색</button>
 
                     <small style="display: block; margin-top: 10px; color: #666; font-size: 0.85em; text-align: center;">
-                        💡 OpenStreetMap 기반 실시간 경로 조회 (API 키 불필요)
+                        💡 API 키 입력 시 실제 버스/지하철 노선 정보 제공
                     </small>
 
                     <div class="preferences">
@@ -593,6 +601,7 @@
             const departureTime = document.getElementById('departureTime').value;
             const travelDuration = document.getElementById('travelDuration').value;
             const transportMode = document.getElementById('transportMode').value;
+            const odsayApiKey = document.getElementById('odsayApiKey').value.trim();
 
             // 사용자 취향 수집
             const interests = Array.from(document.querySelectorAll('input[name="interest"]:checked'))
@@ -604,8 +613,15 @@
             document.getElementById('loading').classList.add('active');
 
             try {
-                // OSRM API로 실제 경로 조회 (무료, API 키 불필요)
-                const routeCoordinates = await generateRouteWithOSRM(departure, arrival, transportMode, departureTime, travelDuration);
+                let routeCoordinates;
+
+                if (odsayApiKey) {
+                    // ODsay API로 실제 대중교통 경로 조회
+                    routeCoordinates = await generateRouteWithODsay(departure, arrival, transportMode, departureTime, travelDuration, odsayApiKey);
+                } else {
+                    // OSRM API로 경로 조회 (API 키 불필요)
+                    routeCoordinates = await generateRouteWithOSRM(departure, arrival, transportMode, departureTime, travelDuration);
+                }
 
                 // 경로 인근 추천 장소 표시
                 showRecommendationsAlongRoute(routeCoordinates, interests, foodPrefs);
@@ -640,6 +656,162 @@
 
             // 기본값 (서울)
             return { name: query, lat: 37.5665, lng: 126.9780 };
+        }
+
+        // ODsay API를 사용한 실제 대중교통 경로 조회
+        async function generateRouteWithODsay(departure, arrival, mode, time, duration, apiKey) {
+            const startLoc = findLocation(departure);
+            const endLoc = findLocation(arrival);
+
+            try {
+                // Nominatim API로 주소를 좌표로 변환
+                const startCoord = await geocodeAddress(departure) || startLoc;
+                const endCoord = await geocodeAddress(arrival) || endLoc;
+
+                // ODsay API 경로 검색
+                const odsayUrl = `https://api.odsay.com/v1/api/searchPubTransPathT?apiKey=${apiKey}&SX=${startCoord.lng}&SY=${startCoord.lat}&EX=${endCoord.lng}&EY=${endCoord.lat}&OPT=0&SearchType=0`;
+
+                const response = await fetch(odsayUrl);
+
+                if (!response.ok) {
+                    throw new Error('ODsay API 호출 실패. API 키를 확인해주세요.');
+                }
+
+                const data = await response.json();
+
+                if (data.result && data.result.path && data.result.path.length > 0) {
+                    // ODsay 경로 데이터 파싱 및 표시
+                    const coordinates = displayODsayRoute(data, startCoord, endCoord, departure, arrival, time, duration);
+                    return coordinates;
+                } else {
+                    console.warn('ODsay에서 경로를 찾을 수 없습니다. OSRM으로 전환합니다.');
+                    return await generateRouteWithOSRM(departure, arrival, mode, time, duration);
+                }
+
+            } catch (error) {
+                console.error('ODsay API 오류:', error);
+                alert('ODsay API 조회 실패. 기본 경로로 표시합니다.');
+                return await generateRouteWithOSRM(departure, arrival, mode, time, duration);
+            }
+        }
+
+        // ODsay 경로 데이터 표시
+        function displayODsayRoute(odsayData, startLoc, endLoc, departure, arrival, time, duration) {
+            markersLayer.clearLayers();
+            routeLayer.clearLayers();
+
+            // 시작/종료 마커
+            addStartEndMarkers(startLoc, endLoc, departure, arrival, time, duration);
+
+            // 최적 경로 선택 (첫 번째 경로)
+            const pathInfo = odsayData.result.path[0].info;
+            const subPaths = odsayData.result.path[0].subPath;
+
+            let routes = [];
+            let allCoordinates = [[startLoc.lat, startLoc.lng]];
+
+            // 각 구간별로 경로 생성
+            subPaths.forEach((subPath, index) => {
+                const pathType = subPath.trafficType; // 1: 지하철, 2: 버스, 3: 도보
+
+                let routeName = '';
+                let routeType = 'walk';
+                let routePoints = [];
+
+                if (pathType === 1) {
+                    // 지하철
+                    routeType = 'train';
+                    const lineName = subPath.lane ? subPath.lane[0].name : '지하철';
+                    routeName = lineName;
+                } else if (pathType === 2) {
+                    // 버스
+                    routeType = 'bus';
+                    const busNo = subPath.lane ? subPath.lane[0].busNo : '버스';
+                    routeName = `${busNo}번 버스`;
+                } else if (pathType === 3) {
+                    // 도보
+                    routeType = 'walk';
+                    routeName = '도보 이동';
+                }
+
+                // 경로 좌표 생성 (실제 경로 좌표가 있으면 사용, 없으면 시작-끝점 직선)
+                if (subPath.passStopList && subPath.passStopList.stations) {
+                    // 정류장 좌표들
+                    routePoints = subPath.passStopList.stations.map(station => [station.y, station.x]);
+                } else {
+                    // 직선 경로
+                    const startY = subPath.startY || startLoc.lat;
+                    const startX = subPath.startX || startLoc.lng;
+                    const endY = subPath.endY || endLoc.lat;
+                    const endX = subPath.endX || endLoc.lng;
+                    routePoints = [[startY, startX], [endY, endX]];
+                }
+
+                allCoordinates = allCoordinates.concat(routePoints);
+
+                const distance = subPath.distance ? (subPath.distance / 1000).toFixed(1) + 'km' : '-';
+                const sectionTime = subPath.sectionTime ? subPath.sectionTime + '분' : '-';
+
+                routes.push({
+                    type: routeType,
+                    name: routeName,
+                    time: sectionTime,
+                    distance: distance,
+                    waypoint: routePoints.length > 0 ? {
+                        lat: routePoints[Math.floor(routePoints.length / 2)][0],
+                        lng: routePoints[Math.floor(routePoints.length / 2)][1]
+                    } : null,
+                    points: routePoints
+                });
+            });
+
+            allCoordinates.push([endLoc.lat, endLoc.lng]);
+
+            // 전체 경로 배경선 그리기
+            L.polyline(allCoordinates, {
+                color: '#333',
+                weight: 8,
+                opacity: 0.3
+            }).addTo(routeLayer);
+
+            // 각 구간 경로선 그리기
+            routes.forEach(route => {
+                if (route.points && route.points.length > 0) {
+                    const color = getTransportColor(route.type);
+
+                    const routeLine = L.polyline(route.points, {
+                        color: color,
+                        weight: 6,
+                        opacity: 0.9,
+                        dashArray: route.type === 'walk' ? '10, 10' : null,
+                        lineJoin: 'round',
+                        lineCap: 'round'
+                    }).addTo(routeLayer);
+
+                    routeLine.bindPopup(`<b>${route.name}</b><br>${route.time}<br>${route.distance}`);
+
+                    // 중간 지점 마커
+                    if (route.waypoint) {
+                        L.marker([route.waypoint.lat, route.waypoint.lng], {
+                            icon: L.divIcon({
+                                html: `<div style="background: ${color}; color: white; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; border: 3px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.3);">${transportIcons[route.type]}</div>`,
+                                className: '',
+                                iconSize: [35, 35]
+                            })
+                        }).addTo(markersLayer).bindPopup(`<b>${route.name}</b><br>${route.time}`);
+                    }
+                }
+            });
+
+            // 지도 범위 조정
+            if (allCoordinates.length > 0) {
+                map.fitBounds(allCoordinates, { padding: [50, 50] });
+            }
+
+            // 경로 정보 패널 업데이트
+            displayRouteInfo(routes, time);
+
+            return allCoordinates;
         }
 
         // OSRM API를 사용한 실제 경로 조회 (무료, API 키 불필요)
