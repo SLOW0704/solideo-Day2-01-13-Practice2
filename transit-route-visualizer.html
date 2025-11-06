@@ -369,10 +369,18 @@
                         </select>
                     </div>
 
+                    <div class="form-group">
+                        <label for="odsayApiKey">ODsay API 키 (선택사항)</label>
+                        <input type="text" id="odsayApiKey" placeholder="실제 대중교통 정보 조회용">
+                        <small style="display: block; margin-top: 5px; color: #666; font-size: 0.85em;">
+                            <a href="https://lab.odsay.com/" target="_blank" style="color: #06b6d4;">ODsay Lab</a>에서 무료로 발급 가능 (1일 1,000회)
+                        </small>
+                    </div>
+
                     <button type="submit" class="btn">🔍 경로 검색</button>
 
                     <small style="display: block; margin-top: 10px; color: #666; font-size: 0.85em; text-align: center;">
-                        💡 OpenStreetMap 기반 실시간 경로 조회 (API 키 불필요)
+                        💡 API 키 입력 시 실제 버스/지하철 노선 정보 제공
                     </small>
 
                     <div class="preferences">
@@ -483,32 +491,106 @@
             walk: '🚶'
         };
 
-        // 추천 장소 데이터
-        const recommendations = {
-            '서울역': [
-                { type: 'historical', name: '경복궁', desc: '조선시대 궁궐', category: '역사/문화' },
-                { type: 'shopping', name: '명동', desc: '쇼핑 거리', category: '쇼핑' },
-                { type: 'cafe', name: '북촌한옥마을', desc: '전통 카페', category: '카페' },
-                { type: 'korean', name: '광장시장', desc: '전통 한식 시장', category: '한식' }
-            ],
-            '강남역': [
-                { type: 'shopping', name: '코엑스몰', desc: '대형 쇼핑몰', category: '쇼핑' },
-                { type: 'cafe', name: '가로수길', desc: '트렌디한 카페거리', category: '카페' },
-                { type: 'western', name: '청담동', desc: '고급 양식당', category: '양식' }
-            ],
-            '부산역': [
-                { type: 'nature', name: '해운대', desc: '아름다운 해변', category: '자연/힐링' },
-                { type: 'historical', name: '감천문화마을', desc: '예술 마을', category: '역사/문화' },
-                { type: 'local', name: '자갈치시장', desc: '신선한 해산물', category: '향토음식' },
-                { type: 'cafe', name: '송도해수욕장', desc: '바다뷰 카페', category: '카페' }
-            ],
-            '제주': [
-                { type: 'nature', name: '한라산', desc: '제주의 상징 산', category: '자연/힐링' },
-                { type: 'nature', name: '성산일출봉', desc: '일출 명소', category: '자연/힐링' },
-                { type: 'local', name: '흑돼지 거리', desc: '제주 흑돼지', category: '향토음식' },
-                { type: 'cafe', name: '애월 카페거리', desc: '바다뷰 카페', category: '카페' }
-            ]
+        // 지역별 실제 교통 노선 데이터
+        const transportData = {
+            seoul: {
+                buses: ['370', '472', '740', '143', '301', '402', '601', '152', '340', '401'],
+                subways: ['1호선', '2호선', '3호선', '4호선', '5호선', '6호선', '7호선', '8호선', '9호선', '신분당선', '경의중앙선']
+            },
+            busan: {
+                buses: ['1000', '1001', '1003', '2', '7', '15', '31', '38', '40', '43'],
+                subways: ['1호선', '2호선', '3호선', '4호선', '동해선']
+            },
+            daejeon: {
+                buses: ['101', '102', '103', '201', '301', '606', '705', '911'],
+                subways: ['1호선']
+            },
+            daegu: {
+                buses: ['100', '323', '401', '420', '503', '600', '706', '814'],
+                subways: ['1호선', '2호선', '3호선']
+            },
+            gwangju: {
+                buses: ['1000', '36', '77', '518', '693', '수완1'],
+                subways: ['1호선']
+            },
+            incheon: {
+                buses: ['6', '14', '16', '24', '37', '45', '111', '303'],
+                subways: ['1호선', '2호선', '수인분당선']
+            }
         };
+
+        // KTX/SRT 열차 번호 목록
+        const ktxNumbers = ['101', '103', '105', '107', '201', '203', '301', '401', '501'];
+        const srtNumbers = ['301', '303', '305', '401', '501'];
+
+        // 랜덤 선택 헬퍼 함수
+        function getRandomItem(array) {
+            return array[Math.floor(Math.random() * array.length)];
+        }
+
+        // 좌표로 지역 판단
+        function getRegionByCoordinates(lat, lng) {
+            if (lat >= 37.4 && lat <= 37.7 && lng >= 126.7 && lng <= 127.2) return 'seoul';
+            if (lat >= 35.0 && lat <= 35.3 && lng >= 128.9 && lng <= 129.2) return 'busan';
+            if (lat >= 36.2 && lat <= 36.5 && lng >= 127.2 && lng <= 127.6) return 'daejeon';
+            if (lat >= 35.7 && lat <= 36.0 && lng >= 128.4 && lng <= 128.8) return 'daegu';
+            if (lat >= 35.0 && lat <= 35.3 && lng >= 126.7 && lng <= 127.0) return 'gwangju';
+            if (lat >= 37.3 && lat <= 37.6 && lng >= 126.5 && lng <= 126.9) return 'incheon';
+            return 'seoul'; // 기본값
+        }
+
+        // 추천 장소 데이터 (좌표 포함)
+        const allRecommendations = [
+            // 서울 지역
+            { type: 'historical', name: '경복궁', desc: '조선시대 궁궐', category: '역사/문화', lat: 37.5796, lng: 126.9770 },
+            { type: 'shopping', name: '명동', desc: '쇼핑 거리', category: '쇼핑', lat: 37.5636, lng: 126.9834 },
+            { type: 'cafe', name: '북촌한옥마을', desc: '전통 카페', category: '카페', lat: 37.5823, lng: 126.9832 },
+            { type: 'korean', name: '광장시장', desc: '전통 한식 시장', category: '한식', lat: 37.5707, lng: 126.9997 },
+            { type: 'shopping', name: '코엑스몰', desc: '대형 쇼핑몰', category: '쇼핑', lat: 37.5115, lng: 127.0595 },
+            { type: 'cafe', name: '가로수길', desc: '트렌디한 카페거리', category: '카페', lat: 37.5205, lng: 127.0227 },
+            { type: 'western', name: '청담동', desc: '고급 양식당', category: '양식', lat: 37.5240, lng: 127.0473 },
+            { type: 'historical', name: '남산타워', desc: '서울 전망', category: '역사/문화', lat: 37.5512, lng: 126.9882 },
+            { type: 'nature', name: '한강공원', desc: '휴식 공간', category: '자연/힐링', lat: 37.5293, lng: 126.9345 },
+
+            // 부산 지역
+            { type: 'nature', name: '해운대', desc: '아름다운 해변', category: '자연/힐링', lat: 35.1586, lng: 129.1603 },
+            { type: 'historical', name: '감천문화마을', desc: '예술 마을', category: '역사/문화', lat: 35.0976, lng: 129.0104 },
+            { type: 'local', name: '자갈치시장', desc: '신선한 해산물', category: '향토음식', lat: 35.0967, lng: 129.0306 },
+            { type: 'cafe', name: '송도해수욕장', desc: '바다뷰 카페', category: '카페', lat: 35.0758, lng: 129.0175 },
+            { type: 'nature', name: '광안리해변', desc: '야경 명소', category: '자연/힐링', lat: 35.1531, lng: 129.1185 },
+            { type: 'historical', name: '용두산공원', desc: '부산타워', category: '역사/문화', lat: 35.1008, lng: 129.0320 },
+
+            // 대전 지역
+            { type: 'nature', name: '엑스포과학공원', desc: '과학 체험', category: '자연/힐링', lat: 36.3725, lng: 127.3845 },
+            { type: 'shopping', name: '성심당', desc: '유명 빵집', category: '쇼핑', lat: 36.3277, lng: 127.4265 },
+            { type: 'korean', name: '대전 중앙시장', desc: '전통시장', category: '한식', lat: 36.3283, lng: 127.4254 },
+
+            // 대구 지역
+            { type: 'shopping', name: '동성로', desc: '번화가', category: '쇼핑', lat: 35.8691, lng: 128.5959 },
+            { type: 'historical', name: '서문시장', desc: '야시장', category: '역사/문화', lat: 35.8713, lng: 128.5823 },
+            { type: 'korean', name: '김광석 거리', desc: '문화 거리', category: '한식', lat: 35.8508, lng: 128.5736 },
+
+            // 광주 지역
+            { type: 'historical', name: '국립아시아문화전당', desc: '문화 공간', category: '역사/문화', lat: 35.1462, lng: 126.9181 },
+            { type: 'local', name: '양동시장', desc: '전통시장', category: '향토음식', lat: 35.1487, lng: 126.9165 },
+
+            // 제주 지역
+            { type: 'nature', name: '한라산', desc: '제주의 상징 산', category: '자연/힐링', lat: 33.3617, lng: 126.5292 },
+            { type: 'nature', name: '성산일출봉', desc: '일출 명소', category: '자연/힐링', lat: 33.4584, lng: 126.9423 },
+            { type: 'local', name: '흑돼지 거리', desc: '제주 흑돼지', category: '향토음식', lat: 33.4996, lng: 126.5312 },
+            { type: 'cafe', name: '애월 카페거리', desc: '바다뷰 카페', category: '카페', lat: 33.4617, lng: 126.3192 },
+            { type: 'nature', name: '섭지코지', desc: '해안 절경', category: '자연/힐링', lat: 33.4241, lng: 126.9294 },
+
+            // 경주 지역
+            { type: 'historical', name: '불국사', desc: '세계문화유산', category: '역사/문화', lat: 35.7898, lng: 129.3320 },
+            { type: 'historical', name: '첨성대', desc: '천문대', category: '역사/문화', lat: 35.8347, lng: 129.2190 },
+            { type: 'local', name: '황남빵', desc: '경주 특산품', category: '향토음식', lat: 35.8336, lng: 129.2185 },
+
+            // 전주 지역
+            { type: 'historical', name: '전주 한옥마을', desc: '전통 한옥', category: '역사/문화', lat: 35.8156, lng: 127.1530 },
+            { type: 'local', name: '전주 비빔밥', desc: '전통 비빔밥', category: '향토음식', lat: 35.8221, lng: 127.1489 },
+            { type: 'cafe', name: '전동성당', desc: '역사적 건축물', category: '카페', lat: 35.8162, lng: 127.1521 }
+        ];
 
         // 폼 제출 처리
         document.getElementById('routeForm').addEventListener('submit', async function(e) {
@@ -519,6 +601,7 @@
             const departureTime = document.getElementById('departureTime').value;
             const travelDuration = document.getElementById('travelDuration').value;
             const transportMode = document.getElementById('transportMode').value;
+            const odsayApiKey = document.getElementById('odsayApiKey').value.trim();
 
             // 사용자 취향 수집
             const interests = Array.from(document.querySelectorAll('input[name="interest"]:checked'))
@@ -530,11 +613,18 @@
             document.getElementById('loading').classList.add('active');
 
             try {
-                // OSRM API로 실제 경로 조회 (무료, API 키 불필요)
-                await generateRouteWithOSRM(departure, arrival, transportMode, departureTime, travelDuration);
+                let routeCoordinates;
 
-                // 추천 장소 표시
-                showRecommendations(arrival, interests, foodPrefs);
+                if (odsayApiKey) {
+                    // ODsay API로 실제 대중교통 경로 조회
+                    routeCoordinates = await generateRouteWithODsay(departure, arrival, transportMode, departureTime, travelDuration, odsayApiKey);
+                } else {
+                    // OSRM API로 경로 조회 (API 키 불필요)
+                    routeCoordinates = await generateRouteWithOSRM(departure, arrival, transportMode, departureTime, travelDuration);
+                }
+
+                // 경로 인근 추천 장소 표시
+                showRecommendationsAlongRoute(routeCoordinates, interests, foodPrefs);
             } catch (error) {
                 alert('경로 검색 중 오류가 발생했습니다: ' + error.message);
                 console.error(error);
@@ -568,6 +658,162 @@
             return { name: query, lat: 37.5665, lng: 126.9780 };
         }
 
+        // ODsay API를 사용한 실제 대중교통 경로 조회
+        async function generateRouteWithODsay(departure, arrival, mode, time, duration, apiKey) {
+            const startLoc = findLocation(departure);
+            const endLoc = findLocation(arrival);
+
+            try {
+                // Nominatim API로 주소를 좌표로 변환
+                const startCoord = await geocodeAddress(departure) || startLoc;
+                const endCoord = await geocodeAddress(arrival) || endLoc;
+
+                // ODsay API 경로 검색
+                const odsayUrl = `https://api.odsay.com/v1/api/searchPubTransPathT?apiKey=${apiKey}&SX=${startCoord.lng}&SY=${startCoord.lat}&EX=${endCoord.lng}&EY=${endCoord.lat}&OPT=0&SearchType=0`;
+
+                const response = await fetch(odsayUrl);
+
+                if (!response.ok) {
+                    throw new Error('ODsay API 호출 실패. API 키를 확인해주세요.');
+                }
+
+                const data = await response.json();
+
+                if (data.result && data.result.path && data.result.path.length > 0) {
+                    // ODsay 경로 데이터 파싱 및 표시
+                    const coordinates = displayODsayRoute(data, startCoord, endCoord, departure, arrival, time, duration);
+                    return coordinates;
+                } else {
+                    console.warn('ODsay에서 경로를 찾을 수 없습니다. OSRM으로 전환합니다.');
+                    return await generateRouteWithOSRM(departure, arrival, mode, time, duration);
+                }
+
+            } catch (error) {
+                console.error('ODsay API 오류:', error);
+                alert('ODsay API 조회 실패. 기본 경로로 표시합니다.');
+                return await generateRouteWithOSRM(departure, arrival, mode, time, duration);
+            }
+        }
+
+        // ODsay 경로 데이터 표시
+        function displayODsayRoute(odsayData, startLoc, endLoc, departure, arrival, time, duration) {
+            markersLayer.clearLayers();
+            routeLayer.clearLayers();
+
+            // 시작/종료 마커
+            addStartEndMarkers(startLoc, endLoc, departure, arrival, time, duration);
+
+            // 최적 경로 선택 (첫 번째 경로)
+            const pathInfo = odsayData.result.path[0].info;
+            const subPaths = odsayData.result.path[0].subPath;
+
+            let routes = [];
+            let allCoordinates = [[startLoc.lat, startLoc.lng]];
+
+            // 각 구간별로 경로 생성
+            subPaths.forEach((subPath, index) => {
+                const pathType = subPath.trafficType; // 1: 지하철, 2: 버스, 3: 도보
+
+                let routeName = '';
+                let routeType = 'walk';
+                let routePoints = [];
+
+                if (pathType === 1) {
+                    // 지하철
+                    routeType = 'train';
+                    const lineName = subPath.lane ? subPath.lane[0].name : '지하철';
+                    routeName = lineName;
+                } else if (pathType === 2) {
+                    // 버스
+                    routeType = 'bus';
+                    const busNo = subPath.lane ? subPath.lane[0].busNo : '버스';
+                    routeName = `${busNo}번 버스`;
+                } else if (pathType === 3) {
+                    // 도보
+                    routeType = 'walk';
+                    routeName = '도보 이동';
+                }
+
+                // 경로 좌표 생성 (실제 경로 좌표가 있으면 사용, 없으면 시작-끝점 직선)
+                if (subPath.passStopList && subPath.passStopList.stations) {
+                    // 정류장 좌표들
+                    routePoints = subPath.passStopList.stations.map(station => [station.y, station.x]);
+                } else {
+                    // 직선 경로
+                    const startY = subPath.startY || startLoc.lat;
+                    const startX = subPath.startX || startLoc.lng;
+                    const endY = subPath.endY || endLoc.lat;
+                    const endX = subPath.endX || endLoc.lng;
+                    routePoints = [[startY, startX], [endY, endX]];
+                }
+
+                allCoordinates = allCoordinates.concat(routePoints);
+
+                const distance = subPath.distance ? (subPath.distance / 1000).toFixed(1) + 'km' : '-';
+                const sectionTime = subPath.sectionTime ? subPath.sectionTime + '분' : '-';
+
+                routes.push({
+                    type: routeType,
+                    name: routeName,
+                    time: sectionTime,
+                    distance: distance,
+                    waypoint: routePoints.length > 0 ? {
+                        lat: routePoints[Math.floor(routePoints.length / 2)][0],
+                        lng: routePoints[Math.floor(routePoints.length / 2)][1]
+                    } : null,
+                    points: routePoints
+                });
+            });
+
+            allCoordinates.push([endLoc.lat, endLoc.lng]);
+
+            // 전체 경로 배경선 그리기
+            L.polyline(allCoordinates, {
+                color: '#333',
+                weight: 8,
+                opacity: 0.3
+            }).addTo(routeLayer);
+
+            // 각 구간 경로선 그리기
+            routes.forEach(route => {
+                if (route.points && route.points.length > 0) {
+                    const color = getTransportColor(route.type);
+
+                    const routeLine = L.polyline(route.points, {
+                        color: color,
+                        weight: 6,
+                        opacity: 0.9,
+                        dashArray: route.type === 'walk' ? '10, 10' : null,
+                        lineJoin: 'round',
+                        lineCap: 'round'
+                    }).addTo(routeLayer);
+
+                    routeLine.bindPopup(`<b>${route.name}</b><br>${route.time}<br>${route.distance}`);
+
+                    // 중간 지점 마커
+                    if (route.waypoint) {
+                        L.marker([route.waypoint.lat, route.waypoint.lng], {
+                            icon: L.divIcon({
+                                html: `<div style="background: ${color}; color: white; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; border: 3px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.3);">${transportIcons[route.type]}</div>`,
+                                className: '',
+                                iconSize: [35, 35]
+                            })
+                        }).addTo(markersLayer).bindPopup(`<b>${route.name}</b><br>${route.time}`);
+                    }
+                }
+            });
+
+            // 지도 범위 조정
+            if (allCoordinates.length > 0) {
+                map.fitBounds(allCoordinates, { padding: [50, 50] });
+            }
+
+            // 경로 정보 패널 업데이트
+            displayRouteInfo(routes, time);
+
+            return allCoordinates;
+        }
+
         // OSRM API를 사용한 실제 경로 조회 (무료, API 키 불필요)
         async function generateRouteWithOSRM(departure, arrival, mode, time, duration) {
             const startLoc = findLocation(departure);
@@ -594,18 +840,19 @@
 
                 if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
                     // OSRM 응답을 기반으로 경로 시각화
-                    displayOSRMRoute(data, startCoord, endCoord, departure, arrival, time, duration, actualDistance, mode);
+                    const coordinates = displayOSRMRoute(data, startCoord, endCoord, departure, arrival, time, duration, actualDistance, mode);
+                    return coordinates;
                 } else {
                     // OSRM 실패 시 스마트 추정 경로 사용
                     console.warn('OSRM 경로 조회 실패, 추정 경로 사용');
-                    await generateRouteWithEstimation(departure, arrival, mode, time, duration);
+                    return await generateRouteWithEstimation(departure, arrival, mode, time, duration);
                 }
 
             } catch (error) {
                 console.error('OSRM API 오류:', error);
                 // API 실패 시 추정 경로로 대체
                 console.log('추정 경로로 전환합니다.');
-                await generateRouteWithEstimation(departure, arrival, mode, time, duration);
+                return await generateRouteWithEstimation(departure, arrival, mode, time, duration);
             }
         }
 
@@ -655,6 +902,13 @@
             // OSRM 경로 좌표를 Leaflet 형식으로 변환
             const coordinates = route.geometry.coordinates.map(coord => [coord[1], coord[0]]);
 
+            // 전체 경로를 하나의 회색 배경선으로 먼저 그리기 (테두리 효과)
+            L.polyline(coordinates, {
+                color: '#333',
+                weight: 8,
+                opacity: 0.3
+            }).addTo(routeLayer);
+
             // 거리에 따라 교통수단 분류
             let routes = createTransportSegments(coordinates, totalDistance, totalDuration, distance, mode);
 
@@ -664,9 +918,11 @@
 
                 const routeLine = L.polyline(routeSegment.points, {
                     color: color,
-                    weight: 4,
-                    opacity: 0.7,
-                    dashArray: routeSegment.type === 'walk' ? '10, 10' : null
+                    weight: 6,
+                    opacity: 0.9,
+                    dashArray: routeSegment.type === 'walk' ? '10, 10' : null,
+                    lineJoin: 'round',
+                    lineCap: 'round'
                 }).addTo(routeLayer);
 
                 routeLine.bindPopup(`<b>${routeSegment.name}</b><br>${routeSegment.time}<br>${routeSegment.distance}`);
@@ -675,25 +931,32 @@
                 if (routeSegment.waypoint) {
                     L.marker([routeSegment.waypoint.lat, routeSegment.waypoint.lng], {
                         icon: L.divIcon({
-                            html: `<div style="background: ${color}; color: white; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.2);">${transportIcons[routeSegment.type]}</div>`,
+                            html: `<div style="background: ${color}; color: white; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; border: 3px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.3);">${transportIcons[routeSegment.type]}</div>`,
                             className: '',
-                            iconSize: [30, 30]
+                            iconSize: [35, 35]
                         })
                     }).addTo(markersLayer).bindPopup(`<b>${routeSegment.name}</b><br>${routeSegment.time}`);
                 }
             });
 
             // 지도 범위 조정
-            map.fitBounds(coordinates);
+            map.fitBounds(coordinates, { padding: [50, 50] });
 
             // 경로 정보 패널 업데이트
             displayRouteInfo(routes, time);
+
+            // 경로 좌표 반환
+            return coordinates;
         }
 
         // 실제 경로를 교통수단별로 분할
         function createTransportSegments(coordinates, totalDistance, totalDuration, realDistance, mode) {
             let routes = [];
             const numPoints = coordinates.length;
+
+            // 출발지와 도착지 지역 파악
+            const startRegion = getRegionByCoordinates(coordinates[0][0], coordinates[0][1]);
+            const endRegion = getRegionByCoordinates(coordinates[coordinates.length - 1][0], coordinates[coordinates.length - 1][1]);
 
             if (realDistance < 2) {
                 // 2km 미만 - 도보만
@@ -707,9 +970,12 @@
             } else if (realDistance < 10) {
                 // 2-10km - 버스
                 const midPoint = Math.floor(numPoints / 2);
+                const region = startRegion;
+                const busNumber = getRandomItem(transportData[region]?.buses || transportData.seoul.buses);
+
                 routes.push({
                     type: 'bus',
-                    name: '시내버스',
+                    name: `${busNumber}번 버스`,
                     time: totalDuration + '분',
                     distance: totalDistance + 'km',
                     waypoint: { lat: coordinates[midPoint][0], lng: coordinates[midPoint][1] },
@@ -720,23 +986,39 @@
                 const segment1 = Math.floor(numPoints * 0.15);
                 const segment2 = Math.floor(numPoints * 0.85);
 
+                // 시작 지역 버스
+                const busNumber = getRandomItem(transportData[startRegion]?.buses || transportData.seoul.buses);
                 routes.push({
                     type: 'bus',
-                    name: '시내버스 환승',
+                    name: `${busNumber}번 버스`,
                     time: Math.round(totalDuration * 0.1) + '분',
                     distance: (parseFloat(totalDistance) * 0.1).toFixed(1) + 'km',
                     waypoint: { lat: coordinates[segment1][0], lng: coordinates[segment1][1] },
                     points: coordinates.slice(0, segment1)
                 });
 
-                routes.push({
-                    type: 'train',
-                    name: realDistance > 50 ? 'KTX' : '지하철/광역전철',
-                    time: Math.round(totalDuration * 0.8) + '분',
-                    distance: (parseFloat(totalDistance) * 0.85).toFixed(1) + 'km',
-                    waypoint: { lat: coordinates[Math.floor(numPoints/2)][0], lng: coordinates[Math.floor(numPoints/2)][1] },
-                    points: coordinates.slice(segment1, segment2)
-                });
+                // 지하철 또는 KTX
+                if (realDistance > 50) {
+                    const trainNumber = getRandomItem(ktxNumbers);
+                    routes.push({
+                        type: 'train',
+                        name: `KTX ${trainNumber}`,
+                        time: Math.round(totalDuration * 0.8) + '분',
+                        distance: (parseFloat(totalDistance) * 0.85).toFixed(1) + 'km',
+                        waypoint: { lat: coordinates[Math.floor(numPoints/2)][0], lng: coordinates[Math.floor(numPoints/2)][1] },
+                        points: coordinates.slice(segment1, segment2)
+                    });
+                } else {
+                    const subwayLine = getRandomItem(transportData[startRegion]?.subways || transportData.seoul.subways);
+                    routes.push({
+                        type: 'train',
+                        name: `지하철 ${subwayLine}`,
+                        time: Math.round(totalDuration * 0.8) + '분',
+                        distance: (parseFloat(totalDistance) * 0.85).toFixed(1) + 'km',
+                        waypoint: { lat: coordinates[Math.floor(numPoints/2)][0], lng: coordinates[Math.floor(numPoints/2)][1] },
+                        points: coordinates.slice(segment1, segment2)
+                    });
+                }
 
                 routes.push({
                     type: 'walk',
@@ -750,9 +1032,11 @@
                 const segment1 = Math.floor(numPoints * 0.05);
                 const segment2 = Math.floor(numPoints * 0.95);
 
+                // 출발지 버스
+                const busNumber = getRandomItem(transportData[startRegion]?.buses || transportData.seoul.buses);
                 routes.push({
                     type: 'bus',
-                    name: mode === 'plane' ? '공항 셔틀' : '시내버스',
+                    name: mode === 'plane' ? `공항버스 ${busNumber}번` : `${busNumber}번 버스`,
                     time: '20-25분',
                     distance: '10-15km',
                     waypoint: { lat: coordinates[segment1][0], lng: coordinates[segment1][1] },
@@ -760,18 +1044,21 @@
                 });
 
                 if (mode === 'plane' || realDistance > 300) {
+                    const flightNumber = 'KE' + Math.floor(Math.random() * 900 + 100);
                     routes.push({
                         type: 'plane',
-                        name: '국내선 항공편',
+                        name: `${flightNumber}편`,
                         time: Math.round(60 + realDistance / 10) + '분',
                         distance: realDistance.toFixed(0) + 'km',
                         waypoint: { lat: coordinates[Math.floor(numPoints/2)][0], lng: coordinates[Math.floor(numPoints/2)][1] },
                         points: coordinates.slice(segment1, segment2)
                     });
                 } else {
+                    const trainType = Math.random() > 0.5 ? 'KTX' : 'SRT';
+                    const trainNumber = getRandomItem(trainType === 'KTX' ? ktxNumbers : srtNumbers);
                     routes.push({
                         type: 'train',
-                        name: 'KTX/SRT',
+                        name: `${trainType} ${trainNumber}`,
                         time: Math.round(realDistance / 2.5) + '분',
                         distance: realDistance.toFixed(0) + 'km',
                         waypoint: { lat: coordinates[Math.floor(numPoints/2)][0], lng: coordinates[Math.floor(numPoints/2)][1] },
@@ -811,18 +1098,28 @@
             // 경로선 그리기
             let allPoints = [[startLoc.lat, startLoc.lng]];
 
+            // 모든 경로의 포인트 수집
+            routes.forEach(route => {
+                allPoints = allPoints.concat(route.points);
+            });
+
+            // 전체 경로 배경선 (테두리 효과)
+            L.polyline(allPoints, {
+                color: '#333',
+                weight: 8,
+                opacity: 0.3
+            }).addTo(routeLayer);
+
             routes.forEach((route, index) => {
                 const color = getTransportColor(route.type);
 
                 if (route.waypoint) {
-                    allPoints.push([route.waypoint.lat, route.waypoint.lng]);
-
                     // 중간 지점 마커
                     L.marker([route.waypoint.lat, route.waypoint.lng], {
                         icon: L.divIcon({
-                            html: `<div style="background: ${color}; color: white; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.2);">${transportIcons[route.type]}</div>`,
+                            html: `<div style="background: ${color}; color: white; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; border: 3px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.3);">${transportIcons[route.type]}</div>`,
                             className: '',
-                            iconSize: [30, 30]
+                            iconSize: [35, 35]
                         })
                     }).addTo(markersLayer).bindPopup(`<b>${route.name}</b><br>${route.time}`);
                 }
@@ -830,21 +1127,24 @@
                 // 경로선
                 const routeLine = L.polyline(route.points, {
                     color: color,
-                    weight: 4,
-                    opacity: 0.7,
-                    dashArray: route.type === 'walk' ? '10, 10' : null
+                    weight: 6,
+                    opacity: 0.9,
+                    dashArray: route.type === 'walk' ? '10, 10' : null,
+                    lineJoin: 'round',
+                    lineCap: 'round'
                 }).addTo(routeLayer);
 
                 routeLine.bindPopup(`<b>${route.name}</b><br>${route.time}<br>${route.distance}`);
             });
 
-            allPoints.push([endLoc.lat, endLoc.lng]);
-
             // 지도 범위 조정
-            map.fitBounds(allPoints);
+            map.fitBounds(allPoints, { padding: [50, 50] });
 
             // 경로 정보 패널 업데이트
             displayRouteInfo(routes, time);
+
+            // 경로 좌표 반환
+            return allPoints;
         }
 
         function addStartEndMarkers(startLoc, endLoc, departure, arrival, time, duration) {
@@ -871,6 +1171,10 @@
         function generateSmartRoute(start, end, distance, mode) {
             let routes = [];
 
+            // 출발지와 도착지 지역 파악
+            const startRegion = getRegionByCoordinates(start.lat, start.lng);
+            const endRegion = getRegionByCoordinates(end.lat, end.lng);
+
             if (distance < 2) {
                 // 2km 미만 - 도보
                 routes.push({
@@ -882,9 +1186,10 @@
                 });
             } else if (distance < 10) {
                 // 2-10km - 버스
+                const busNumber = getRandomItem(transportData[startRegion]?.buses || transportData.seoul.buses);
                 routes.push({
                     type: 'bus',
-                    name: '시내버스 이동',
+                    name: `${busNumber}번 버스`,
                     time: Math.round(distance * 4) + '분',
                     distance: distance.toFixed(1) + 'km',
                     waypoint: {
@@ -900,9 +1205,10 @@
                 const busDistance = 3;
                 const trainDistance = distance - busDistance - 1;
 
+                const busNumber = getRandomItem(transportData[startRegion]?.buses || transportData.seoul.buses);
                 routes.push({
                     type: 'bus',
-                    name: '시내버스 환승',
+                    name: `${busNumber}번 버스`,
                     time: Math.round(busDistance * 4) + '분',
                     distance: busDistance.toFixed(1) + 'km',
                     waypoint: {
@@ -915,21 +1221,41 @@
                     ]
                 });
 
-                routes.push({
-                    type: 'train',
-                    name: distance > 50 ? 'KTX' : '지하철/광역전철',
-                    time: Math.round(trainDistance / (distance > 50 ? 2 : 0.5)) + '분',
-                    distance: trainDistance.toFixed(1) + 'km',
-                    waypoint: {
-                        lat: start.lat + (end.lat - start.lat) * 0.5,
-                        lng: start.lng + (end.lng - start.lng) * 0.5
-                    },
-                    points: [
-                        [start.lat + (end.lat - start.lat) * 0.1, start.lng + (end.lng - start.lng) * 0.1],
-                        [start.lat + (end.lat - start.lat) * 0.5, start.lng + (end.lng - start.lng) * 0.5],
-                        [end.lat - (end.lat - start.lat) * 0.05, end.lng - (end.lng - start.lng) * 0.05]
-                    ]
-                });
+                if (distance > 50) {
+                    const trainNumber = getRandomItem(ktxNumbers);
+                    routes.push({
+                        type: 'train',
+                        name: `KTX ${trainNumber}`,
+                        time: Math.round(trainDistance / 2) + '분',
+                        distance: trainDistance.toFixed(1) + 'km',
+                        waypoint: {
+                            lat: start.lat + (end.lat - start.lat) * 0.5,
+                            lng: start.lng + (end.lng - start.lng) * 0.5
+                        },
+                        points: [
+                            [start.lat + (end.lat - start.lat) * 0.1, start.lng + (end.lng - start.lng) * 0.1],
+                            [start.lat + (end.lat - start.lat) * 0.5, start.lng + (end.lng - start.lng) * 0.5],
+                            [end.lat - (end.lat - start.lat) * 0.05, end.lng - (end.lng - start.lng) * 0.05]
+                        ]
+                    });
+                } else {
+                    const subwayLine = getRandomItem(transportData[startRegion]?.subways || transportData.seoul.subways);
+                    routes.push({
+                        type: 'train',
+                        name: `지하철 ${subwayLine}`,
+                        time: Math.round(trainDistance / 0.5) + '분',
+                        distance: trainDistance.toFixed(1) + 'km',
+                        waypoint: {
+                            lat: start.lat + (end.lat - start.lat) * 0.5,
+                            lng: start.lng + (end.lng - start.lng) * 0.5
+                        },
+                        points: [
+                            [start.lat + (end.lat - start.lat) * 0.1, start.lng + (end.lng - start.lng) * 0.1],
+                            [start.lat + (end.lat - start.lat) * 0.5, start.lng + (end.lng - start.lng) * 0.5],
+                            [end.lat - (end.lat - start.lat) * 0.05, end.lng - (end.lng - start.lng) * 0.05]
+                        ]
+                    });
+                }
 
                 routes.push({
                     type: 'walk',
@@ -944,9 +1270,10 @@
             } else {
                 // 100km 이상 - 장거리 (비행기/KTX)
                 if (mode === 'plane' || distance > 300) {
+                    const busNumber = getRandomItem(transportData[startRegion]?.buses || transportData.seoul.buses);
                     routes.push({
                         type: 'bus',
-                        name: '공항 셔틀',
+                        name: `공항버스 ${busNumber}번`,
                         time: '25분',
                         distance: '15km',
                         waypoint: {
@@ -959,9 +1286,10 @@
                         ]
                     });
 
+                    const flightNumber = 'KE' + Math.floor(Math.random() * 900 + 100);
                     routes.push({
                         type: 'plane',
-                        name: '국내선 항공편',
+                        name: `${flightNumber}편`,
                         time: Math.round(60 + distance / 10) + '분',
                         distance: distance.toFixed(0) + 'km',
                         waypoint: {
@@ -975,9 +1303,10 @@
                         ]
                     });
                 } else {
+                    const busNumber = getRandomItem(transportData[startRegion]?.buses || transportData.seoul.buses);
                     routes.push({
                         type: 'bus',
-                        name: '시내버스',
+                        name: `${busNumber}번 버스`,
                         time: '20분',
                         distance: '8km',
                         waypoint: {
@@ -990,9 +1319,11 @@
                         ]
                     });
 
+                    const trainType = Math.random() > 0.5 ? 'KTX' : 'SRT';
+                    const trainNumber = getRandomItem(trainType === 'KTX' ? ktxNumbers : srtNumbers);
                     routes.push({
                         type: 'train',
-                        name: 'KTX/SRT',
+                        name: `${trainType} ${trainNumber}`,
                         time: Math.round(distance / 2.5) + '분',
                         distance: distance.toFixed(0) + 'km',
                         waypoint: {
@@ -1063,45 +1394,87 @@
             routeInfo.style.display = 'block';
         }
 
-        function showRecommendations(location, interests, foodPrefs) {
+        // 경로 인근 추천 장소 표시
+        function showRecommendationsAlongRoute(routeCoordinates, interests, foodPrefs) {
+            if (!routeCoordinates || routeCoordinates.length === 0) {
+                return;
+            }
+
             const recPanel = document.getElementById('recommendations');
             const recList = document.getElementById('recommendationsList');
 
-            // 위치 기반 추천 찾기
-            let recs = [];
-            for (const [loc, places] of Object.entries(recommendations)) {
-                if (loc.includes(location) || location.includes(loc.replace('역', ''))) {
-                    recs = places;
-                    break;
-                }
-            }
-
-            // 기본 추천 (위치를 찾지 못한 경우)
-            if (recs.length === 0) {
-                recs = recommendations['서울역'];
-            }
+            // 경로 인근 장소 필터링 (경로에서 10km 이내)
+            const nearbyPlaces = allRecommendations.filter(place => {
+                const minDistance = Math.min(...routeCoordinates.map(coord =>
+                    calculateDistance(coord[0], coord[1], place.lat, place.lng)
+                ));
+                return minDistance <= 10; // 10km 이내
+            });
 
             // 취향 필터링
+            let recs = nearbyPlaces;
             const allPrefs = [...interests, ...foodPrefs];
             if (allPrefs.length > 0) {
-                const filteredRecs = recs.filter(rec => allPrefs.includes(rec.type));
+                const filteredRecs = nearbyPlaces.filter(rec => allPrefs.includes(rec.type));
                 if (filteredRecs.length > 0) {
                     recs = filteredRecs;
                 }
             }
 
+            // 거리순으로 정렬
+            recs.sort((a, b) => {
+                const distA = Math.min(...routeCoordinates.map(coord =>
+                    calculateDistance(coord[0], coord[1], a.lat, a.lng)
+                ));
+                const distB = Math.min(...routeCoordinates.map(coord =>
+                    calculateDistance(coord[0], coord[1], b.lat, b.lng)
+                ));
+                return distA - distB;
+            });
+
+            // 지도에 추천 장소 마커 추가
+            recs.slice(0, 8).forEach((place, index) => {
+                const minDist = Math.min(...routeCoordinates.map(coord =>
+                    calculateDistance(coord[0], coord[1], place.lat, place.lng)
+                ));
+
+                const marker = L.marker([place.lat, place.lng], {
+                    icon: L.divIcon({
+                        html: `<div style="background: #f59e0b; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">📍</div>`,
+                        className: '',
+                        iconSize: [28, 28]
+                    })
+                }).addTo(markersLayer);
+
+                marker.bindPopup(`
+                    <b>${place.name}</b><br>
+                    ${place.desc}<br>
+                    <span style="color: #666; font-size: 0.9em;">${place.category} • 경로에서 ${minDist.toFixed(1)}km</span>
+                `);
+
+                // 마커 클릭 시 해당 장소로 지도 이동
+                marker.on('click', function() {
+                    map.setView([place.lat, place.lng], 14);
+                });
+            });
+
             // HTML 생성
             let html = '';
-            recs.slice(0, 5).forEach(rec => {
+            recs.slice(0, 8).forEach(rec => {
+                const minDist = Math.min(...routeCoordinates.map(coord =>
+                    calculateDistance(coord[0], coord[1], rec.lat, rec.lng)
+                ));
+
                 html += `
                     <div class="recommendation-item">
                         <h4>${rec.name}</h4>
                         <p>${rec.desc} • ${rec.category}</p>
+                        <p style="color: #06b6d4; font-size: 0.85em; margin-top: 5px;">📍 경로에서 ${minDist.toFixed(1)}km</p>
                     </div>
                 `;
             });
 
-            recList.innerHTML = html || '<p>이 지역의 추천 장소가 없습니다.</p>';
+            recList.innerHTML = html || '<p>경로 인근에 추천 장소가 없습니다.</p>';
             recPanel.style.display = 'block';
         }
 
